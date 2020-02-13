@@ -31,8 +31,8 @@ poly_order = 20
 gjpower = -0.5
 
 #SGD parameters
-SGD_rate = 1e-8
-SGD_noise = 0.001
+SGD_rate = 1e-7
+SGD_noise = SGD_rate*1e3
 
 #weighting for lagrange multipliers
 LM_boundary_weight = 100
@@ -59,8 +59,8 @@ int_weights_tf = tf.constant(gaussjacobi[1].reshape((n_points,1)),dtype=tf.float
 if module_testing_on:
     #testing where the velocity field is linear u = z
     poly_coef_np = np.zeros((poly_order[0],1))
-    poly_coef_np[1] = 1
-    poly_coef_np[2] = 0
+    poly_coef_np[1] = 3
+    poly_coef_np[2] = -1
     poly_coef_tf = tf.constant(poly_coef_np,dtype=tf.float32)
 else:
     poly_coef_tf = tf.random.normal(poly_order)
@@ -70,28 +70,28 @@ for i in range(0,300):
         g.watch(poly_coef_tf)
         #IMPORTANT: factor of a half needed in all integrals to convert from [0,1] domain to [-1,1] domain
         ubar_tf = tf.matmul(tf.constant(np.ones((1,poly_order[0]),dtype=np.float32)),tf.math.divide(poly_coef_tf,(poly_index+1)))
-
+        poly_coef_tf /= ubar_tf
         #velocity rescaled in the [-1:1] domain and normalized
-        v_tf = TFFpolyevalfast(poly_coef_tf,0.5*zz_tf + 0.5,poly_order)/ubar_tf
+        v_tf = TFFpolyevalfast(poly_coef_tf,0.5*zz_tf + 0.5,poly_order)
 
 
 
         #first derivative
-        dvdz_tf = TFFpolyderiv(poly_coef_tf,0.5*zz_tf + 0.5,poly_order)/ubar_tf
+        dvdz_tf = TFFpolyderiv(poly_coef_tf,0.5*zz_tf + 0.5,poly_order)
         #print(tf.math.log(dvdz_tf))
         #print(int_weights_tf)
 
         #entropy
-        H = TFFgjintegrate(tf.math.log(dvdz_tf),zz_tf,int_weights_tf,gjpower)
+        H = TFFgjintegrate(tf.math.abs(tf.math.log(dvdz_tf))+1e-5,zz_tf,int_weights_tf,gjpower)
         #print(H)
 
         #lagrange multiplier terms:
 
         #ensure positivity lagrange multiplier term
-        LM_positive_tf = TFFgjintegrate(tf.math.exp(-100*dvdz_tf),zz_tf,int_weights_tf,gjpower)
+        LM_positive_tf = TFFgjintegrate(tf.math.exp(-1000*dvdz_tf),zz_tf,int_weights_tf,gjpower)
 
         #ensure dudz|z=1 = 0 lagrange multiplier term
-        LM_boundary_tf = tf.pow(tf.math.reduce_sum(poly_coef_tf[1:]*tf.constant(np.arange(1,poly_order[0],1).reshape((poly_order[0]-1,1)),dtype=tf.float32))/ubar_tf,2)
+        LM_boundary_tf = tf.pow(tf.math.reduce_sum(poly_coef_tf[1:]*tf.constant(np.arange(1,poly_order[0],1).reshape((poly_order[0]-1,1)),dtype=tf.float32)),2)
 
 
         #cost function
@@ -104,8 +104,15 @@ for i in range(0,300):
         opt_op.run()
         """
         grads = g.gradient(loss,poly_coef_tf)
+        test_isnan = np.isnan(grads.numpy())
+        
+        if test_isnan.any():
+            print(grads)
+            print(poly_coef_tf)
+            plt.pause(10000)
         poly_coef_tf -= grads*SGD_rate
         poly_coef_tf += SGD_noise*poly_coef_tf*tf.pow(tf.random.normal(poly_order),2)
+        print(loss)
         print(loss.numpy())
         #plt.pause(2)
     del g
@@ -122,18 +129,29 @@ for i in range(0,300):
 
 #IMPORTANT: factor of a half needed in all integrals to convert from [0,1] domain to [-1,1] domain
 ubar_tf = tf.matmul(tf.constant(np.ones((1,poly_order[0]),dtype=np.float32)),tf.math.divide(poly_coef_tf,(poly_index+1)))
-
+poly_coef_tf /= ubar_tf
 #velocity rescaled in the [-1:1] domain and normalized
-v_tf = TFFpolyevalfast(poly_coef_tf,0.5*zz_tf + 0.5,poly_order)/ubar_tf
+v_tf = TFFpolyevalfast(poly_coef_tf,0.5*zz_tf + 0.5,poly_order)
 u_bar_test = TFFgjintegrate(v_tf,zz_tf,int_weights_tf,gjpower)
 #first derivative
-dvdz_tf = TFFpolyderiv(poly_coef_tf,0.5*zz_tf + 0.5,poly_order)/ubar_tf
+dvdz_tf = TFFpolyderiv(poly_coef_tf,0.5*zz_tf + 0.5,poly_order)
 #print(tf.math.log(dvdz_tf))
 #print(int_weights_tf)
 
 #entropy
 H = TFFgjintegrate(tf.math.log(dvdz_tf),zz_tf,int_weights_tf,gjpower)
+LM_positive_tf = TFFgjintegrate(tf.math.exp(-1000*dvdz_tf),zz_tf,int_weights_tf,gjpower)
+
+#ensure dudz|z=1 = 0 lagrange multiplier term
+LM_boundary_tf = tf.pow(tf.math.reduce_sum(poly_coef_tf[1:]*tf.constant(np.arange(1,poly_order[0],1).reshape((poly_order[0]-1,1)),dtype=tf.float32)),2)
+
+loss = H + LM_positive_tf*LM_positive_weight + LM_boundary_tf*LM_boundary_weight
+#print(u_bar_test)
 print(H)
+print(LM_positive_tf*LM_positive_weight)
+print(LM_boundary_tf*LM_boundary_weight)
+print(loss)
 #plt.plot(zz_tf.numpy(),(tf.math.exp(-10*dvdz_tf)+1).numpy().flatten())
 plt.plot(zz_tf.numpy(),(v_tf/ubar_tf).numpy().flatten())
-plt.pause(1000)
+plt.plot(zz_tf.numpy(),1.5*(2*((zz_tf.numpy()+1)/2) - ((zz_tf.numpy()+1)/2)**2))
+plt.pause(100000)
