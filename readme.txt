@@ -1,4 +1,5 @@
 main.py numerically generates the family of maximum entropy solutions for free surface flows for various shape factors, \chi_2 and generates data for H against \chi_2.
+optimizeChi2.py optimises H for a specific value of chi_2
 
 For further information see the letter within this repo.
 
