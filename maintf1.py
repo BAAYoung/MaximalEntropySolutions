@@ -103,7 +103,7 @@ with tf.Session() as session:
 
     print(session.run(loss))
     #plt.pause(100000)
-    for j in range(500):
+    for j in range(50):
         for i in range(300):
             session.run(train_op)
         print(session.run(loss))

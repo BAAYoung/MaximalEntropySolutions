@@ -25,9 +25,9 @@ def TFFpolyderiv(poly_coef_tf,zz_tf,poly_order):
 
 #numerical parameters
 n_points = 100
-poly_order = 20
+poly_order = 8
 gjpower = -0.5
-chi2 = 1.1
+chi2 = 1.2
 #SGD parameters
 SGD_rate = 1e-8
 SGD_noise = SGD_rate*1e4
@@ -51,7 +51,7 @@ zz_tf = tf.constant(gaussjacobi[0].reshape((n_points,1)),dtype=tf.float32) #grid
 int_weights_tf = tf.constant(gaussjacobi[1].reshape((n_points,1)),dtype=tf.float32)
 
 poly_coef_np = np.zeros((poly_order[0]-2,1))
-poly_coef_np[0] = 5
+poly_coef_np[0] = 1
 poly_coef_np[1] = 0
 poly_coef_np[2] = 0
 
@@ -64,13 +64,14 @@ ubar_tf = tf.matmul(tf.constant(np.ones((1,poly_order[0]),dtype=np.float32)),tf.
 poly_coef_tf /= ubar_tf
 v_tf = TFFpolyevalfast(poly_coef_tf,0.5*zz_tf + 0.5,poly_order)
 dvdz_tf = TFFpolyderiv(poly_coef_tf,0.5*zz_tf + 0.5,poly_order)
-
+u2_tf = TFFgjintegrate(tf.math.pow(v_tf,2),zz_tf,int_weights_tf,gjpower)
 
 H = TFFgjintegrate(tf.math.log(dvdz_tf),zz_tf,int_weights_tf,gjpower)
+LM_chi_tf = tf.math.pow(TFFgjintegrate(tf.math.pow(v_tf,2),zz_tf,int_weights_tf,gjpower) - chi2,2)
 
-loss = H
+loss = -H 
 
-optimizer = tf.train.AdadeltaOptimizer(0.05,rho=0.95,epsilon=1e-8)
+optimizer = tf.train.AdadeltaOptimizer(0.5,rho=0.95,epsilon=1e-8)
 train_op = optimizer.minimize(loss)
 LM_chi_tf = tf.math.pow(TFFgjintegrate(tf.math.pow(v_tf,2),zz_tf,int_weights_tf,gjpower) - chi2,2)
 
@@ -79,7 +80,7 @@ with tf.Session() as session:
     print(session.run(H))
     #plt.pause(10000)
 
-    """ for j in range(50):
+    """ for j in range(100):
         for i in range(300):
             session.run(train_op)
         #print(session.run(loss))
@@ -92,7 +93,7 @@ with tf.Session() as session:
     chi = session.run(TFFgjintegrate(tf.math.pow(v_tf,2),zz_tf,int_weights_tf,gjpower))
     poly_coef_np = session.run(poly_coef_tf)
 
-#print(chi)
+print(chi)
 #print(poly_coef_np)
 plt.plot(zz_np,v_np)
 #plt.plot(zz_np,dvdz_np)
