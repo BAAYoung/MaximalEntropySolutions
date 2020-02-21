@@ -97,7 +97,7 @@ LM_LHS_tf = tf.pow(-tf.reduce_sum(poly_coef_tf*np.arange(0,poly_order[0],1).resh
 #entropy
 u2_tf = TFFgjintegrate(tf.math.pow(v_tf,2),zz_tf,int_weights_tf,gjpower)
 H = TFFgjintegrate(tf.math.log(dvdz_tf),zz_tf,int_weights_tf,gjpower)
-loss = -H + LM_macroE_tf*LM_macroE_weight + LM_LHS_tf*LHS_weight + LM_chi_tf*LM_shape_factor
+loss = -H + LM_macroE_tf*LM_macroE_weight + LM_LHS_tf*LHS_weight #+ LM_chi_tf*LM_shape_factor
 #loss = -u2_tf*0.5
 optimizer = tf.train.AdadeltaOptimizer(0.1,rho=0.95,epsilon=1e-8)
 train_op = optimizer.minimize(loss)
@@ -112,7 +112,7 @@ with tf.Session() as session:
     print(session.run(LM_LHS_tf))
     #plt.pause(10000)
 
-    for j in range(1000):
+    for j in range(100):
         for i in range(300):
             session.run(train_op)
         print(session.run(loss))
